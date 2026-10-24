@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { exec } from "node:child_process";
 import notifier from "node-notifier";
+import { YoutubeTranscript } from "youtube-transcript";
 
 function playSystemSound(type = "asterisk") {
   const soundMap: Record<string, string> = {
@@ -214,6 +215,70 @@ server.tool(
       return {
         isError: true,
         content: [{ type: "text", text: `Lỗi phát âm thanh: ${error.message}` }],
+      };
+    }
+  }
+);
+
+// Tool 6: Lấy phụ đề / kịch bản video YouTube từ URL (Không cần tải video về)
+server.tool(
+  "get_youtube_transcript",
+  "Lấy toàn bộ phụ đề / kịch bản lời thoại (transcript) của một video YouTube chỉ bằng đường link (URL). Tuyệt đối không cần tải video về máy.",
+  {
+    urlOrVideoId: z
+      .string()
+      .describe("Đường link video YouTube (vd: https://www.youtube.com/watch?v=... hoặc https://youtu.be/...) hoặc ID video"),
+    lang: z
+      .string()
+      .optional()
+      .describe("Mã ngôn ngữ phụ đề mong muốn (vd: 'en' cho tiếng Anh, 'vi' cho tiếng Việt). Nếu không truyền sẽ lấy ngôn ngữ mặc định."),
+    includeTimestamps: z
+      .boolean()
+      .optional()
+      .describe("Có kèm theo mốc thời gian [phút:giây] ở từng câu không (mặc định: false, trả về đoạn văn liền mạch)"),
+  },
+  async ({ urlOrVideoId, lang, includeTimestamps = false }) => {
+    try {
+      const options: any = {};
+      if (lang) options.lang = lang;
+
+      const transcript = await YoutubeTranscript.fetchTranscript(urlOrVideoId, options);
+      if (!transcript || transcript.length === 0) {
+        return {
+          content: [{ type: "text", text: "Không tìm thấy phụ đề (transcript) cho video này." }],
+        };
+      }
+
+      function formatTime(ms: number) {
+        const totalSeconds = Math.floor(ms / 1000);
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+      }
+
+      let formattedText: string;
+      if (includeTimestamps) {
+        formattedText = transcript
+          .map((item) => `[${formatTime(item.offset)}] ${item.text.replace(/\n/g, " ")}`)
+          .join("\n");
+      } else {
+        formattedText = transcript
+          .map((item) => item.text.replace(/\n/g, " "))
+          .join(" ");
+      }
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: `### 🎬 KỊCH BẢN YOUTUBE BÓC TÁCH THÀNH CÔNG (${transcript.length} đoạn):\n\n${formattedText}`,
+          },
+        ],
+      };
+    } catch (error: any) {
+      return {
+        isError: true,
+        content: [{ type: "text", text: `Lỗi bóc tách phụ đề YouTube: ${error.message}` }],
       };
     }
   }

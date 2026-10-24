@@ -22,12 +22,13 @@ MCP Server chạy local cung cấp các tool tiện ích hệ thống và bộ *
 6. **`satek_i18n_check_duplicate_keys`**:
    * Soi trùng lặp key trong các file từ điển `src/locales/vi/*.ts` (ngăn chặn triệt để lỗi TypeScript `TS1117`).
 
-### B. Nhóm Tiện ích Hệ thống & Thông báo Desktop
-7. **`notify_windows`** 🔔: Bắn thông báo Windows Toast Notification kèm âm thanh chuông khi AI hoàn thành task hoặc cần gọi bạn quay lại xem kết quả.
-8. **`play_chime`** 🎵: Phát âm thanh chuông báo (Ting / Chime) trực tiếp trên loa máy tính.
-9. **`get_current_time`**: Lấy ngày giờ thực tế hiện tại của hệ thống (Asia/Ho_Chi_Minh).
-10. **`get_system_info`**: Lấy thông tin cấu hình phần cứng: Tên máy, OS, CPU, RAM đang dùng/còn trống, thời gian máy bật (uptime).
-11. **`calculate`**: Thực hiện phép tính toán cơ bản (+, -, *, /) với 2 số.
+### B. Nhóm Tiện ích Hệ thống & Content Creator YouTube
+7. **`get_youtube_transcript`** 🎬: Bóc tách toàn bộ phụ đề / kịch bản video YouTube từ đường link URL trong 1 giây (không cần tải video về). Hỗ trợ lọc ngôn ngữ và xuất mốc thời gian [phút:giây].
+8. **`notify_windows`** 🔔: Bắn thông báo Windows Toast Notification kèm âm thanh chuông khi AI hoàn thành task hoặc cần gọi bạn quay lại xem kết quả.
+9. **`play_chime`** 🎵: Phát âm thanh chuông báo (Ting / Chime) trực tiếp trên loa máy tính.
+10. **`get_current_time`**: Lấy ngày giờ thực tế hiện tại của hệ thống (Asia/Ho_Chi_Minh).
+11. **`get_system_info`**: Lấy thông tin cấu hình phần cứng: Tên máy, OS, CPU, RAM đang dùng/còn trống, thời gian máy bật (uptime).
+12. **`calculate`**: Thực hiện phép tính toán cơ bản (+, -, *, /) với 2 số.
 
 ---
 
