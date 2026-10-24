@@ -1,0 +1,31 @@
+{
+  "mcpServers": {
+    "memory": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-memory"
+      ],
+      "disabled": false
+    },
+    "satek-lint": {
+      "type": "stdio",
+      "command": "bun",
+      "args": [
+        "run",
+        "D:/Hieubkav/MCP/src/satek-lint-server.ts"
+      ],
+      "disabled": false
+    },
+    "hieu-local": {
+      "type": "stdio",
+      "command": "bun",
+      "args": [
+        "run",
+        "D:/Hieubkav/MCP/src/index.ts"
+      ],
+      "disabled": false
+    }
+  }
+}

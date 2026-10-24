@@ -5,7 +5,12 @@ import os from "node:os";
 import path from "node:path";
 import { exec } from "node:child_process";
 import notifier from "node-notifier";
-import { YoutubeTranscript } from "youtube-transcript";
+import {
+  searchYouTube,
+  getYoutubeThumbnail,
+  getYoutubeComments,
+  getYoutubeTranscript,
+} from "./youtube-tools.js";
 
 function playSystemSound(type = "asterisk") {
   const soundMap: Record<string, string> = {
@@ -220,7 +225,112 @@ server.tool(
   }
 );
 
-// Tool 6: Lấy phụ đề / kịch bản video YouTube từ URL (Không cần tải video về)
+// Tool 6: Tìm kiếm video YouTube theo từ khóa (Soi trend, tìm video triệu view)
+server.tool(
+  "youtube_search",
+  "Tìm kiếm video trên YouTube theo từ khóa (kèm lượt xem, ngày đăng, thời lượng, kênh). Không cần API key.",
+  {
+    query: z.string().describe("Từ khóa tìm kiếm (vd: 'AI coding agent', 'review phim hoạt hình', 'hướng dẫn react 19')"),
+    maxResults: z.number().optional().describe("Số lượng video tối đa cần lấy (mặc định: 10, tối đa: 30)"),
+  },
+  async ({ query, maxResults = 10 }) => {
+    try {
+      const videos = await searchYouTube(query, maxResults);
+      if (videos.length === 0) {
+        return {
+          content: [{ type: "text", text: `Không tìm thấy video nào cho từ khóa: "${query}".` }],
+        };
+      }
+
+      let md = `## 🔍 KẾT QUẢ TÌM KIẾM YOUTUBE CHO: "${query}" (${videos.length} videos)\n\n`;
+      videos.forEach((v, index) => {
+        md += `### ${index + 1}. [${v.title}](${v.url})\n`;
+        md += `- 📺 **Kênh:** ${v.author} | ⏱️ **Thời lượng:** ${v.duration} | 📅 **Đăng:** ${v.uploaded}\n`;
+        md += `- 👁️ **Lượt xem:** ${Number(v.views).toLocaleString('vi-VN')} views\n`;
+        md += `- 🔗 **Link:** \`${v.url}\`\n\n`;
+      });
+
+      return {
+        content: [{ type: "text", text: md }],
+      };
+    } catch (error: any) {
+      return {
+        isError: true,
+        content: [{ type: "text", text: `Lỗi tìm kiếm YouTube: ${error.message}` }],
+      };
+    }
+  }
+);
+
+// Tool 7: Lấy link Thumbnail HD / 4K hoặc tải về máy
+server.tool(
+  "get_youtube_thumbnail",
+  "Lấy link ảnh bìa Thumbnail độ phân giải cao nhất (Full HD / 4K / maxresdefault) của video YouTube, hỗ trợ tải trực tiếp về thư mục máy tính.",
+  {
+    urlOrVideoId: z.string().describe("Link video YouTube (vd: https://youtube.com/watch?v=...) hoặc video ID"),
+    downloadPath: z.string().optional().describe("Thư mục lưu ảnh thumbnail trên máy tính (nếu muốn tải về)"),
+  },
+  async ({ urlOrVideoId, downloadPath }) => {
+    try {
+      const res = await getYoutubeThumbnail(urlOrVideoId, downloadPath);
+      let md = `## 🖼️ THUMBNAIL YOUTUBE (Video ID: \`${res.videoId}\`)\n\n`;
+      md += `* **Max Resolution (1080p/4K):** [Xem ảnh MaxRes](${res.thumbnails.maxres})\n`;
+      md += `* **High Quality (HQ 480p):** [Xem ảnh HQ](${res.thumbnails.hq})\n`;
+      md += `* **Medium Quality (MQ 360p):** [Xem ảnh MQ](${res.thumbnails.mq})\n\n`;
+
+      if (res.downloadedFile) {
+        md += `💾 **Đã tải ảnh về máy thành công:** \`${res.downloadedFile}\`\n`;
+      }
+
+      return {
+        content: [{ type: "text", text: md }],
+      };
+    } catch (error: any) {
+      return {
+        isError: true,
+        content: [{ type: "text", text: `Lỗi lấy thumbnail: ${error.message}` }],
+      };
+    }
+  }
+);
+
+// Tool 8: Cào bình luận (comments) của video YouTube
+server.tool(
+  "get_youtube_comments",
+  "Lấy danh sách bình luận (comments) của video YouTube (nhiều like nhất hoặc mới nhất) để nghiên cứu tâm lý khán giả và lấy ý tưởng nội dung.",
+  {
+    urlOrVideoId: z.string().describe("Link video YouTube hoặc video ID"),
+    limit: z.number().optional().describe("Số lượng bình luận cần lấy (mặc định: 20, tối đa: 100)"),
+    sort: z.enum(["popular", "recent"]).optional().describe("Cách sắp xếp: 'popular' (nhiều like nhất, mặc định) hoặc 'recent' (mới nhất)"),
+  },
+  async ({ urlOrVideoId, limit = 20, sort = "popular" }) => {
+    try {
+      const comments = await getYoutubeComments(urlOrVideoId, limit, sort);
+      if (!comments || comments.length === 0) {
+        return {
+          content: [{ type: "text", text: "Video này không có bình luận nào hoặc đã tắt tính năng bình luận." }],
+        };
+      }
+
+      let md = `## 💬 TOP BÌNH LUẬN YOUTUBE (${comments.length} bình luận - sắp xếp: ${sort}):\n\n`;
+      comments.forEach((c, idx) => {
+        md += `**${idx + 1}. ${c.author}** (👍 ${c.votes} likes - ${c.time}):\n`;
+        md += `> ${c.text.replace(/\n/g, "\n> ")}\n\n`;
+      });
+
+      return {
+        content: [{ type: "text", text: md }],
+      };
+    } catch (error: any) {
+      return {
+        isError: true,
+        content: [{ type: "text", text: `Lỗi cào bình luận YouTube: ${error.message}` }],
+      };
+    }
+  }
+);
+
+// Tool 9: Lấy phụ đề / kịch bản video YouTube từ URL (Không cần tải video về)
 server.tool(
   "get_youtube_transcript",
   "Lấy toàn bộ phụ đề / kịch bản lời thoại (transcript) của một video YouTube chỉ bằng đường link (URL). Tuyệt đối không cần tải video về máy.",
@@ -239,39 +349,18 @@ server.tool(
   },
   async ({ urlOrVideoId, lang, includeTimestamps = false }) => {
     try {
-      const options: any = {};
-      if (lang) options.lang = lang;
-
-      const transcript = await YoutubeTranscript.fetchTranscript(urlOrVideoId, options);
-      if (!transcript || transcript.length === 0) {
+      const res = await getYoutubeTranscript(urlOrVideoId, lang, includeTimestamps);
+      if (res.count === 0) {
         return {
           content: [{ type: "text", text: "Không tìm thấy phụ đề (transcript) cho video này." }],
         };
-      }
-
-      function formatTime(ms: number) {
-        const totalSeconds = Math.floor(ms / 1000);
-        const minutes = Math.floor(totalSeconds / 60);
-        const seconds = totalSeconds % 60;
-        return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
-      }
-
-      let formattedText: string;
-      if (includeTimestamps) {
-        formattedText = transcript
-          .map((item) => `[${formatTime(item.offset)}] ${item.text.replace(/\n/g, " ")}`)
-          .join("\n");
-      } else {
-        formattedText = transcript
-          .map((item) => item.text.replace(/\n/g, " "))
-          .join(" ");
       }
 
       return {
         content: [
           {
             type: "text",
-            text: `### 🎬 KỊCH BẢN YOUTUBE BÓC TÁCH THÀNH CÔNG (${transcript.length} đoạn):\n\n${formattedText}`,
+            text: `### 🎬 KỊCH BẢN YOUTUBE BÓC TÁCH THÀNH CÔNG (${res.count} đoạn):\n\n${res.text}`,
           },
         ],
       };
