@@ -2,6 +2,24 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import os from "node:os";
+import path from "node:path";
+import { exec } from "node:child_process";
+import notifier from "node-notifier";
+
+function playSystemSound(type = "asterisk") {
+  const soundMap: Record<string, string> = {
+    asterisk: "[System.Media.SystemSounds]::Asterisk.Play()",
+    exclamation: "[System.Media.SystemSounds]::Exclamation.Play()",
+    beep: "[System.Media.SystemSounds]::Beep.Play()",
+    hand: "[System.Media.SystemSounds]::Hand.Play()",
+  };
+  const psCmd = soundMap[type] || soundMap.asterisk;
+  try {
+    exec(`powershell.exe -NoProfile -Command "${psCmd}"`);
+  } catch {
+    // Ignore if sound fails
+  }
+}
 
 // 1. Khởi tạo MCP Server Tiện ích máy tính cá nhân
 const server = new McpServer({
@@ -118,6 +136,86 @@ server.tool(
         },
       ],
     };
+  }
+);
+
+// Tool 4: Bắn thông báo Windows Toast Notification kèm âm thanh và avatar hài hước
+server.tool(
+  "notify_windows",
+  "Bắn thông báo Windows Toast Notification lên góc màn hình kèm âm thanh và icon hài hước khi AI hoàn thành task hoặc cần báo cho người dùng.",
+  {
+    title: z.string().describe("Tiêu đề thông báo (vd: Task hoàn tất, Satek Audit thành công)"),
+    message: z.string().describe("Nội dung chi tiết của thông báo"),
+    icon: z
+      .enum(["toast", "zany", "party", "laugh", "poo", "coffee", "robot", "cat", "dog", "fire", "ghost"])
+      .optional()
+      .describe("Chọn icon hài hước: toast (bánh mì ngủ zzz), zany (ngáo ngơ 🤪), party (quẩy tiệc 🥳), laugh (cười xỉu 😂), poo (cục poo vui vẻ 💩), cat (mèo cute 🐱), dog (chó cưng 🐶), fire (cháy khét 🔥), ghost (con ma 👻), coffee (cà phê chill ☕), robot (người máy 🤖)"),
+    soundType: z
+      .enum(["asterisk", "exclamation", "beep", "hand"])
+      .optional()
+      .describe("Loại âm thanh: asterisk (ting nhẹ, mặc định), exclamation (cảnh báo), beep (bíp), hand (lỗi)"),
+  },
+  async ({ title, message, icon = "toast", soundType = "asterisk" }) => {
+    try {
+      const options: any = {
+        title,
+        message,
+        appID: "Satek Droid",
+        wait: false,
+      };
+
+      if (icon && icon !== "toast") {
+        const iconPath = path.resolve("D:/Hieubkav/MCP/assets/icons", `${icon}.png`);
+        options.icon = iconPath;
+      }
+
+      notifier.notify(options);
+      playSystemSound(soundType);
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: `🔔 Đã gửi thông báo Windows Toast: "${title}" - "${message}" (icon: ${icon}, âm thanh: ${soundType})`,
+          },
+        ],
+      };
+    } catch (error: any) {
+      return {
+        isError: true,
+        content: [{ type: "text", text: `Lỗi gửi thông báo: ${error.message}` }],
+      };
+    }
+  }
+);
+
+// Tool 5: Phát âm thanh chuông báo (Chime)
+server.tool(
+  "play_chime",
+  "Phát âm thanh chuông (Chime/Ting) trên loa máy tính để gây sự chú ý của người dùng khi làm xong việc.",
+  {
+    soundType: z
+      .enum(["asterisk", "exclamation", "beep", "hand"])
+      .optional()
+      .describe("Loại âm thanh: asterisk (ting nhẹ), exclamation (ting cao), beep (bíp), hand (lỗi)"),
+  },
+  async ({ soundType = "asterisk" }) => {
+    try {
+      playSystemSound(soundType);
+      return {
+        content: [
+          {
+            type: "text",
+            text: `🎵 Đã phát chuông hệ thống (${soundType}) thành công!`,
+          },
+        ],
+      };
+    } catch (error: any) {
+      return {
+        isError: true,
+        content: [{ type: "text", text: `Lỗi phát âm thanh: ${error.message}` }],
+      };
+    }
   }
 );
 
