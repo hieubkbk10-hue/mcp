@@ -165,7 +165,7 @@ export function lintI18nFile(targetFilePath: string, projectRoot = DEFAULT_PROJE
     }
 
     // Check B: Trích xuất các hàm trans('...') hoặc t('...')
-    const transMatches = [...lineText.matchAll(/(?:trans|t)\(\s*(['"`])((?:\\.|[^\\])*?)\1/g)];
+    const transMatches = [...lineText.matchAll(/(?<![a-zA-Z0-9_])(?:trans|t)\(\s*(['"`])((?:\\.|[^\\])*?)\1/g)];
     for (const match of transMatches) {
       const key = match[2];
       usedTransKeys.add(key);

@@ -7,6 +7,13 @@ import {
   scanFolderI18n,
   checkDuplicateKeysInLocale,
 } from "./satek-i18n.js";
+import {
+  auditSatekFile,
+  formatAuditReport,
+  listSatekRules,
+  SATEK_PROJECT_ROOT,
+} from "./satek-audit.js";
+import { runLintEngine } from "./satek-core/engine/linter.js";
 
 // 1. Khởi tạo MCP Server
 const server = new McpServer({
@@ -266,6 +273,124 @@ server.tool(
       return {
         isError: true,
         content: [{ type: "text", text: `Lỗi: ${error.message}` }],
+      };
+    }
+  }
+);
+
+// Tool 7: Audit toàn diện 5 Trụ Cột Satek cho 1 file component
+server.tool(
+  "satek_audit_file",
+  "Audit toàn diện 5 Trụ Cột (Formik + Yup, SSOT Hằng số, RTK Query Cache, TypeScript & Imports, UI Tokens & i18n) cho 1 file trong Satek-Client-FE.",
+  {
+    filePath: z
+      .string()
+      .describe("Đường dẫn file cần audit (vd: src/components/setting/tabs/VatTab.tsx hoặc đường dẫn tuyệt đối)"),
+    projectRoot: z
+      .string()
+      .optional()
+      .describe("Thư mục gốc Satek-Client-FE (mặc định: D:/Hieubkav/Reactjs/job/Satek-Client-FE)"),
+  },
+  async ({ filePath, projectRoot = SATEK_PROJECT_ROOT }) => {
+    try {
+      const res = await auditSatekFile(filePath, projectRoot);
+      const markdown = formatAuditReport(res);
+      return {
+        content: [{ type: "text", text: markdown }],
+      };
+    } catch (error: any) {
+      return {
+        isError: true,
+        content: [{ type: "text", text: `Lỗi khi audit file: ${error.message}` }],
+      };
+    }
+  }
+);
+
+// Tool 8: Quét Audit toàn bộ một thư mục với Satek Linter AST v3
+server.tool(
+  "satek_audit_folder",
+  "Quét toàn bộ thư mục trong Satek-Client-FE bằng Satek Linter v3 Engine (phân tích AST, imports, RTK query, design tokens).",
+  {
+    folderPath: z
+      .string()
+      .describe("Đường dẫn thư mục cần quét (vd: src/components/cart hoặc src/routes)"),
+    projectRoot: z
+      .string()
+      .optional()
+      .describe("Thư mục gốc Satek-Client-FE (mặc định: D:/Hieubkav/Reactjs/job/Satek-Client-FE)"),
+  },
+  async ({ folderPath, projectRoot = SATEK_PROJECT_ROOT }) => {
+    try {
+      const res = await runLintEngine({
+        cwd: projectRoot,
+        path: folderPath,
+      });
+
+      let md = `## 📊 KẾT QUẢ QUÉT LINTER V3: \`${folderPath}\`\n\n`;
+      md += `* **Tỷ lệ tuân thủ:** **${res.summary.complianceRate}%**\n`;
+      md += `* **Tổng số tệp:** ${res.summary.totalFiles} (${res.summary.cleanFiles} sạch, ${res.summary.filesWithViolations} tệp có vi phạm)\n`;
+      md += `* **Tổng số vi phạm:** ${res.summary.totalViolations} (🔴 High: ${res.summary.byPriority.HIGH || 0}, 🟡 Medium: ${res.summary.byPriority.MEDIUM || 0}, 🔵 Recommend: ${res.summary.byPriority.RECOMMEND || 0})\n\n`;
+
+      if (res.findings.length > 0) {
+        md += `### ⚠️ Danh sách vi phạm nổi bật:\n`;
+        const topFindings = res.findings.slice(0, 15);
+        topFindings.forEach((f) => {
+          const icon = f.priority === 'CRITICAL' || f.priority === 'HIGH' ? '🔴' : f.priority === 'MEDIUM' ? '🟡' : '🔵';
+          const fileRel = path.relative(projectRoot, f.location?.path || '').replace(/\\/g, '/');
+          md += `- ${icon} **\`${fileRel}:${f.location?.line}\` [${f.ruleCode}]**: ${f.message}\n`;
+          if (f.suggestion) {
+            md += `  > 💡 *Khắc phục:* ${f.suggestion}\n`;
+          }
+        });
+
+        if (res.findings.length > 15) {
+          md += `\n*... và còn ${res.findings.length - 15} vi phạm khác.*\n`;
+        }
+      } else {
+        md += `✅ **Thư mục hoàn toàn sạch, tuân thủ 100% quy chuẩn kiến trúc Satek!**\n`;
+      }
+
+      return {
+        content: [{ type: "text", text: md }],
+      };
+    } catch (error: any) {
+      return {
+        isError: true,
+        content: [{ type: "text", text: `Lỗi khi quét thư mục: ${error.message}` }],
+      };
+    }
+  }
+);
+
+// Tool 9: Tra cứu danh mục quy tắc của Satek Linter v3
+server.tool(
+  "satek_list_rules",
+  "Tra cứu danh mục các quy chuẩn kiến trúc và coding của Satek (hơn 50 rules theo 17 nhóm).",
+  {
+    keyword: z
+      .string()
+      .optional()
+      .describe("Từ khóa tìm kiếm (vd: color, rtk, form, import, barrel, z-index...)"),
+  },
+  async ({ keyword }) => {
+    try {
+      const list = listSatekRules(keyword);
+      let md = `## 📖 DANH MỤC QUY TẮC SATEK LINTER (${list.length} rules)${keyword ? ` cho từ khóa "${keyword}"` : ''}:\n\n`;
+      list.forEach((r) => {
+        md += `### \`[${r.code}]\` ${r.name}\n`;
+        md += `- **Phân loại:** ${r.category} | **Mức độ:** ${r.severity}\n`;
+        md += `- **Mô tả:** ${r.description}\n`;
+        md += `- **Hướng khắc phục:** ${r.fix}\n\n`;
+      });
+
+      return {
+        content: [{ type: "text", text: md }],
+      };
+    } catch (error: any) {
+      return {
+        isError: true,
+        content: [{ type: "text", text: `Lỗi tra cứu: ${error.message}` }],
       };
     }
   }
