@@ -1,0 +1,20 @@
+{
+  "name": "my-first-mcp",
+  "version": "1.0.0",
+  "description": "MCP Server local starter để test trên máy tính",
+  "type": "module",
+  "main": "src/index.ts",
+  "scripts": {
+    "start": "bun src/index.ts",
+    "start:node": "npx tsx src/index.ts",
+    "inspector": "npx @modelcontextprotocol/inspector bun src/index.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.6.1",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.5",
+    "typescript": "^5.7.3"
+  }
+}
